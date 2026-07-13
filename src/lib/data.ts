@@ -20,14 +20,47 @@ export interface Vehicle {
   label: string;
   color: string;
   tc: string; // text color
-  x: number; // % position on map
-  y: number;
+  lat: number; // geographic position
+  lng: number;
+  bearing?: number; // heading in degrees (0 = north)
   line: string;
   dest: string;
   next: string;
   eta: string;
   upd: string;
   status: string;
+  routeId?: string; // GTFS route_id (for joining to static data)
+  tripId?: string; // GTFS-RT trip_id — resolves the live path via /api/trip
+  seq?: number; // currentStopSequence along the trip
+  speed?: number; // metres/second, when the feed reports it
+  occupancy?: string; // e.g. "EMPTY", "MANY_SEATS_AVAILABLE"
+}
+
+// One upcoming stop on a live trip, used to draw the path and animate the
+// vehicle gliding forward between stops in real time ("future buses moving").
+export interface TripStop {
+  seq: number;
+  stopId: string;
+  name: string;
+  lat: number;
+  lng: number;
+  time: number; // predicted unix seconds at this stop
+  eta: string; // "Due" / "3 min"
+  passed: boolean; // already behind the vehicle's current sequence
+}
+
+// Full live detail for a single trip: route metadata + the ordered stop path.
+export interface TripDetail {
+  tripId: string;
+  route: string; // short label, e.g. "504"
+  routeName: string; // long name / line
+  type: Mode;
+  color: string;
+  tc: string;
+  dest: string; // final stop / headsign
+  stops: TripStop[];
+  degraded: boolean;
+  updated: string;
 }
 
 export interface AlertItem {
@@ -39,6 +72,8 @@ export interface AlertItem {
   routes: string;
   desc: string;
   updated: string;
+  url?: string; // link to the official TTC advisory, when available
+  kind?: "alert" | "accessibility" | "service-change"; // source category on ttc.ca
 }
 
 export interface SavedRoute {
@@ -71,7 +106,35 @@ export interface ArrivalCard {
 export interface ChatMsg {
   role: "user" | "assistant";
   text: string;
-  card?: ArrivalCard;
+  card?: ArrivalCard; // legacy single card
+  cards?: ArrivalCard[]; // one card per route/vehicle the answer is about
+}
+
+// API response envelopes. `degraded` is true when live decoding failed and the
+// payload is the mock fallback, so the UI can surface its error/empty states.
+export interface VehiclesResponse {
+  vehicles: Vehicle[];
+  degraded: boolean;
+  updated: string;
+}
+
+export interface AlertsResponse {
+  alerts: AlertItem[];
+  degraded: boolean;
+  updated: string;
+}
+
+export interface ArrivalsResponse {
+  stop: string;
+  arrivals: ArrivalCard[];
+  degraded: boolean;
+  updated: string;
+}
+
+export interface TripResponse {
+  trip: TripDetail | null;
+  degraded: boolean;
+  updated: string;
 }
 
 export const BOARD_SEED: BoardSeed[] = [
@@ -82,12 +145,19 @@ export const BOARD_SEED: BoardSeed[] = [
 ];
 
 export const VEHICLES: Vehicle[] = [
-  { id: "s1", type: "subway", label: "1", color: "#F7C400", tc: "#1F2937", x: 44, y: 30, line: "Line 1 Yonge–University", dest: "Finch", next: "Eglinton", eta: "2 min", upd: "8s", status: "On time" },
-  { id: "s2", type: "subway", label: "2", color: "#00923F", tc: "#fff", x: 64, y: 48, line: "Line 2 Bloor–Danforth", dest: "Kennedy", next: "Broadview", eta: "4 min", upd: "11s", status: "On time" },
-  { id: "b939", type: "bus", label: "939", color: "#D71920", tc: "#fff", x: 28, y: 42, line: "939 Finch Express", dest: "Finch West Stn", next: "Finch & Weston", eta: "4 min", upd: "20s", status: "On time" },
-  { id: "b36", type: "bus", label: "36", color: "#D71920", tc: "#fff", x: 54, y: 21, line: "36 Finch West", dest: "Finch Stn", next: "Finch & Dufferin", eta: "7 min", upd: "15s", status: "Slight delay" },
-  { id: "t504", type: "streetcar", label: "504", color: "#2563EB", tc: "#fff", x: 37, y: 67, line: "504 King", dest: "Dundas West", next: "King & Bathurst", eta: "3 min", upd: "9s", status: "On time" },
-  { id: "t501", type: "streetcar", label: "501", color: "#2563EB", tc: "#fff", x: 62, y: 72, line: "501 Queen", dest: "Long Branch", next: "Queen & Spadina", eta: "6 min", upd: "13s", status: "On time" },
+  { id: "s1", type: "subway", label: "1", color: "#F7C400", tc: "#1F2937", lat: 43.6710, lng: -79.3857, bearing: 0, line: "Line 1 Yonge–University", dest: "Finch", next: "Eglinton", eta: "2 min", upd: "8s", status: "On time" },
+  { id: "s2", type: "subway", label: "2", color: "#00923F", tc: "#fff", lat: 43.6767, lng: -79.3585, bearing: 90, line: "Line 2 Bloor–Danforth", dest: "Kennedy", next: "Broadview", eta: "4 min", upd: "11s", status: "On time" },
+  { id: "b939", type: "bus", label: "939", color: "#D71920", tc: "#fff", lat: 43.7065, lng: -79.4100, bearing: 80, line: "939 Finch Express", dest: "Finch West Stn", next: "Finch & Weston", eta: "4 min", upd: "20s", status: "On time" },
+  { id: "b36", type: "bus", label: "36", color: "#D71920", tc: "#fff", lat: 43.6960, lng: -79.4520, bearing: 270, line: "36 Finch West", dest: "Finch Stn", next: "Finch & Dufferin", eta: "7 min", upd: "15s", status: "Slight delay" },
+  { id: "t504", type: "streetcar", label: "504", color: "#2563EB", tc: "#fff", lat: 43.6440, lng: -79.4020, bearing: 270, line: "504 King", dest: "Dundas West", next: "King & Bathurst", eta: "3 min", upd: "9s", status: "On time" },
+  { id: "t501", type: "streetcar", label: "501", color: "#2563EB", tc: "#fff", lat: 43.6492, lng: -79.3970, bearing: 90, line: "501 Queen", dest: "Long Branch", next: "Queen & Spadina", eta: "6 min", upd: "13s", status: "On time" },
+];
+
+// Mock arrivals fallback for /api/arrivals when the trip-update feed is down.
+export const MOCK_ARRIVALS: ArrivalCard[] = [
+  { route: "939", routeName: "Finch Express", stop: "Finch West Station", direction: "Eastbound", next: "4 min", then: "11 min, 18 min", updated: "20s ago", status: "On time", color: "#D71920" },
+  { route: "1", routeName: "Line 1 Yonge–University", stop: "Finch West Station", direction: "Southbound", next: "2 min", then: "5 min, 9 min", updated: "8s ago", status: "On time", color: "#F7C400" },
+  { route: "36", routeName: "Finch West", stop: "Finch West Station", direction: "Westbound", next: "7 min", then: "14 min, 22 min", updated: "15s ago", status: "Slight delay", color: "#D71920" },
 ];
 
 export const ALERTS: AlertItem[] = [
@@ -103,11 +173,11 @@ export const SAVED_ROUTES: SavedRoute[] = [
 ];
 
 export const PROMPTS = [
-  "When is the 939 coming?",
-  "Is Line 1 delayed?",
-  "Show nearby streetcars.",
-  "How's my commute home?",
-  "Any alerts near Finch West?",
+  "When's my next ride?",
+  "Any delays right now?",
+  "What's nearby?",
+  "Plan a trip",
+  "How's my commute?",
 ];
 
 export const DEMO_MSGS: { role: "user" | "bot"; text: string }[] = [
@@ -122,40 +192,6 @@ export const DEMO_MSGS: { role: "user" | "bot"; text: string }[] = [
   { role: "user", text: "Any alerts near Finch West?" },
   { role: "bot", text: "One: Line 2 has minor delays near Broadview." },
 ];
-
-// Ask Pulse response logic — never asks for numeric stop IDs.
-export function respond(text: string): ChatMsg {
-  const t = text.toLowerCase();
-  const mk = (text: string, card?: ArrivalCard): ChatMsg => ({ role: "assistant", text, card });
-
-  if (t.includes("939") || t.includes("finch"))
-    return mk(
-      "The 939 Finch Express is running on time. Here's the next eastbound arrival at Finch West Station:",
-      { route: "939", routeName: "Finch Express", stop: "Finch West Station", direction: "Eastbound", next: "4 min", then: "11 min, 18 min", updated: "20s ago", status: "On time", color: "#D71920" }
-    );
-  if (t.includes("line 1") || t.includes("delay"))
-    return mk(
-      "Line 1 is running normally with no major delays. I'll flag it here the moment that changes.",
-      { route: "1", routeName: "Line 1 Yonge–University", stop: "Line-wide", direction: "Both directions", next: "2 min", then: "5 min, 9 min", updated: "8s ago", status: "On time", color: "#F7C400" }
-    );
-  if (t.includes("streetcar") || t.includes("504") || t.includes("501") || t.includes("nearby"))
-    return mk(
-      "Two streetcars are approaching nearby:",
-      { route: "504", routeName: "King", stop: "King & Bathurst", direction: "Westbound", next: "3 min", then: "9 min, 16 min", updated: "9s ago", status: "On time", color: "#2563EB" }
-    );
-  if (t.includes("commute") || t.includes("home"))
-    return mk(
-      "Your commute home looks good — the 939 + Line 1 route is about 38 min right now, roughly normal for this time.",
-      { route: "Home", routeName: "Finch West → Union", stop: "Finch West Station", direction: "Southbound", next: "4 min", then: "Transfer at St George", updated: "just now", status: "Normal • 38 min", color: "#16A34A" }
-    );
-  if (t.includes("alert"))
-    return mk(
-      "There's 1 active alert near you: Line 2 has minor delays between Broadview and Castle Frank due to signal work. Buses and streetcars are unaffected."
-    );
-  return mk(
-    "I can help with arrivals, delays, nearby stops and your saved commute. Which stop or route are you travelling on?"
-  );
-}
 
 export const FAQ = [
   { q: "Can I see TTC vehicles live?", a: "Yes. TTC Pulse is designed to show live buses, streetcars, and trains wherever real-time data is available." },

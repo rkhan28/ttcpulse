@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import HeroParallax from "./HeroParallax";
 
 /** Fixed animated transit-network hero that content slides over on scroll. */
 export default function Hero() {
@@ -9,6 +10,7 @@ export default function Hero() {
       className="fixed inset-0 z-0 overflow-hidden"
       style={{ background: "radial-gradient(120% 90% at 50% 0%, #0b1020 0%, #070709 52%, #050505 100%)" }}
     >
+      <HeroParallax />
       {/* parallax network layer */}
       <div
         className="absolute"

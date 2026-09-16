@@ -41,10 +41,10 @@ ALERTS
 
 TRIP PLANNING ("X to Y")
 - Only treat it as a trip when the user gives BOTH an origin and a destination. If they give only one place, don't invent the other — show arrivals there, or ask where they're headed.
-- Give the FASTEST realistic route as a SHORT recommendation: which bus/streetcar/line and where to transfer. Do NOT default to the subway — a direct surface route is often faster. Do NOT dump all arrivals at the origin. You may check live arrivals for the FIRST leg's SPECIFIC route only (get_arrivals with that route). Keep it to 1–3 sentences; if geography is uncertain, give your best call briefly.
+- Give the FASTEST realistic route as a SHORT recommendation: which bus/streetcar/line and where to transfer. Do NOT default to the subway — a direct surface route is often faster. Do NOT dump all arrivals at the origin. You may check live arrivals for the FIRST leg's SPECIFIC route only (get_arrivals with that route). Keep it to 1–3 sentences; if geography is uncertain, say what is uncertain and do not claim an optimal route.
 
 COVERAGE
-- You have live/upcoming arrivals + live positions, not full timetables. For "first/last bus of the day", don't refuse — show the next live arrivals.
+- You have live/upcoming arrivals + live positions, not full timetables. For "first/last bus of the day", explain that first/last service cannot be established from these feeds. Offer the next available predictions separately.
 - Stay a Toronto transit companion; gently redirect off-topic questions.`;
 
 const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -132,9 +132,9 @@ async function runTool(name: string, input: Record<string, unknown>, loc?: Loc):
     let alerts;
     try {
       const live = await getAlerts();
-      alerts = live.length ? live : ALERTS;
+      alerts = live;
     } catch {
-      alerts = ALERTS;
+      return { result: { error: "Service alerts are unavailable. Do not infer that service is normal.", officialUrl: "https://www.ttc.ca/service-alerts" } };
     }
     if (input.route) {
       const q = String(input.route).toLowerCase();
@@ -148,9 +148,9 @@ async function runTool(name: string, input: Record<string, unknown>, loc?: Loc):
     let vehicles;
     try {
       const live = await getVehicles();
-      vehicles = live.length ? live : VEHICLES;
+      vehicles = live;
     } catch {
-      vehicles = VEHICLES;
+      return { result: { error: "Vehicle data is unavailable. Do not invent positions or arrival times." } };
     }
     const near = String(input.near ?? "").trim();
     // Geocode the place to a stop coordinate, then rank vehicles by real distance
@@ -204,14 +204,18 @@ function toMessages(chat: ChatMsg[]): OpenAI.Chat.Completions.ChatCompletionMess
 
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
-    return streamError("Ask Pulse isn't configured yet. Add OPENAI_API_KEY to .env.local to enable the live assistant.");
+    return streamError("Ask Pulse is unavailable in this deployment. You can still browse the map and service alerts.");
   }
 
   let chat: ChatMsg[] = [];
   let loc: Loc | undefined;
   try {
     const body = await req.json();
-    chat = Array.isArray(body?.messages) ? body.messages : [];
+    chat = Array.isArray(body?.messages) ? body.messages.filter((m: unknown): m is ChatMsg => {
+      if (!m || typeof m !== "object") return false;
+      const item = m as Record<string, unknown>;
+      return (item.role === "user" || item.role === "assistant") && typeof item.text === "string" && item.text.length <= 4000;
+    }).slice(-12) : [];
     const l = body?.location;
     if (l && Number.isFinite(l.lat) && Number.isFinite(l.lng) && Math.abs(l.lat) <= 90 && Math.abs(l.lng) <= 180) {
       loc = { lat: l.lat, lng: l.lng };

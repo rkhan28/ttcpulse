@@ -13,12 +13,12 @@ export default function RoutesPage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-[5px] rounded-full text-[12px] text-white/70" style={{ border: "1px solid rgba(255,255,255,.14)" }}>
               <ListFilter size={13} strokeWidth={2} color="#16A34A" />
-              Saved commutes
+              Example commutes
             </div>
-            <h1 className="text-[34px] font-bold tracking-[-1px] mt-3.5 mb-0">Your routes</h1>
-            <p className="text-[15.5px] text-white/55 mt-2.5 max-w-[480px]">Pulse watches these before you leave and flags anything worth knowing.</p>
+            <h1 className="text-[34px] font-bold tracking-[-1px] mt-3.5 mb-0">Route examples</h1>
+            <p className="text-[15.5px] text-white/55 mt-2.5 max-w-[480px]">Sample commute cards. Saving, editing, monitoring, and deleting commutes are not implemented yet.</p>
           </div>
-          <button className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-semibold text-ink bg-white transition-transform hover:-translate-y-0.5">
+          <button disabled title="Not available in this prototype" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-semibold text-ink bg-white transition-transform hover:-translate-y-0.5">
             <Plus size={16} strokeWidth={2.2} />Add commute
           </button>
         </div>
@@ -36,10 +36,10 @@ export default function RoutesPage() {
                   <div className="text-[16px] font-semibold">{r.name}</div>
                 </div>
                 <div className="flex gap-1">
-                  <button aria-label="Edit" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-white/45 hover:bg-white/[.08] hover:text-white">
+                  <button disabled title="Not available in this prototype" aria-label="Edit" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-white/45 hover:bg-white/[.08] hover:text-white">
                     <Pencil size={15} strokeWidth={2} />
                   </button>
-                  <button aria-label="Delete" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-white/45 hover:bg-[rgba(220,38,38,.15)] hover:text-[#F87171]">
+                  <button disabled title="Not available in this prototype" aria-label="Delete" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-white/45 hover:bg-[rgba(220,38,38,.15)] hover:text-[#F87171]">
                     <Trash2 size={15} strokeWidth={2} />
                   </button>
                 </div>
@@ -79,13 +79,13 @@ export default function RoutesPage() {
         ))}
 
         {/* empty-state add card */}
-        <button className="rounded-[22px] min-h-[200px] flex flex-col items-center justify-center gap-3 text-white/50 transition-[border-color,color,background] hover:border-white/40 hover:text-white hover:bg-white/[.02]" style={{ background: "transparent", border: "1.5px dashed rgba(255,255,255,.16)" }}>
+        <button disabled title="Not available in this prototype" className="rounded-[22px] min-h-[200px] flex flex-col items-center justify-center gap-3 text-white/50 transition-[border-color,color,background] hover:border-white/40 hover:text-white hover:bg-white/[.02]" style={{ background: "transparent", border: "1.5px dashed rgba(255,255,255,.16)" }}>
           <span className="inline-flex w-[46px] h-[46px] rounded-[14px] items-center justify-center" style={{ background: "rgba(255,255,255,.06)" }}>
             <Plus size={22} strokeWidth={2} />
           </span>
           <div className="text-center">
             <div className="text-[15px] font-semibold">Add a commute</div>
-            <div className="text-[12.5px] text-white/40 mt-0.5">Pulse will watch it for you</div>
+            <div className="text-[12.5px] text-white/40 mt-0.5">Saving commutes is planned</div>
           </div>
         </button>
       </div>

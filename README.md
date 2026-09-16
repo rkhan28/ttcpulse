@@ -1,123 +1,52 @@
 # TTC Pulse
 
-A live, real-time Toronto transit companion — a premium dark web app that tracks
-TTC buses, streetcars, and subways on a map, answers commute questions with an
-AI assistant grounded in live data, and mirrors the official TTC service alerts.
+A Toronto transit web app built with Next.js, TypeScript, Leaflet, and GTFS-Realtime integrations.
 
-Built with Next.js (App Router), TypeScript, and Tailwind CSS.
+## Current features
 
-## Features
+- `/map`: surface vehicle positions and nearby vehicles, subject to feed availability.
+- `/alerts`: TTC service alerts.
+- `/ask`: optional server-side AI assistant using transit tools.
+- `/routes`: sample commute cards; saving and monitoring are not implemented.
 
-- **Live Map** (`/map`) — a full-viewport dark map. It starts empty; the **Nearby**
-  panel lists real vehicles closest to you, and tapping one reveals that vehicle
-  and animates it gliding along its live predicted path (upcoming stops + ETAs).
-  Motion is interpolated between real GPS fixes with exponential smoothing, and
-  vehicles without stop predictions dead-reckon from their reported heading/speed.
-- **Ask Pulse** (`/ask`) — a streaming chat assistant grounded in the live feeds
-  via tool calls. It uses your location automatically for "near me" questions,
-  filters to a single route when you ask about one, and renders structured arrival
-  cards. It never invents times and never asks for numeric stop IDs.
-- **Alerts** (`/alerts`) — live service alerts scraped from the **official TTC feed**
-  (route disruptions, elevator/escalator status, and planned service changes), so
-  the list matches ttc.ca. Refresh re-scrapes on demand; each planned change links
-  to its official advisory page.
-- **Routes** (`/routes`) — saved-commute cards with route strips, ETAs, and tips.
-- **Home** (`/`) — animated transit-network hero, live ticking arrival boards,
-  feature cards, data grid, and FAQ.
+TTC subway vehicle tracking is not provided by the surface feed. Location requires browser permission. Predictions can be stale or unavailable; this app does not guarantee arrival times or an optimal route.
 
-## Data sources
-
-| Data | Source |
-| --- | --- |
-| Vehicle positions | TTC GTFS-Realtime vehicles feed (surface routes) |
-| Arrivals / trip paths | TTC GTFS-Realtime trip-updates feed |
-| Service alerts + changes | Official ttc.ca alerts API (matches the TTC website) |
-| Stops & routes (names, colours) | TTC GTFS static feed, embedded via `npm run build:gtfs` |
-| Ask Pulse assistant | OpenAI chat model with tools grounded in the feeds above |
-
-The realtime data layer lives in [`src/lib/gtfs.ts`](src/lib/gtfs.ts) and
-[`src/lib/ttc-alerts.ts`](src/lib/ttc-alerts.ts); it decodes the GTFS-RT protobuf,
-caches responses briefly, retries transient failures, and falls back to the last
-known-good data (then to a small mock set) so the UI never blanks during an outage.
-
-## Getting started
+## Run locally
 
 ```bash
-npm install
-cp .env.local.example .env.local   # then fill in the values
-npm run build:gtfs                 # download + embed the TTC static feed (stops/routes)
-npm run dev                        # http://localhost:3000
+npm ci
+cp .env.local.example .env.local
+npm run dev
 ```
 
-### Environment variables (`.env.local`)
+Open `http://localhost:3000`. An OpenAI key is optional; without it, Ask Pulse explains that it is unavailable. Keep `OPENAI_API_KEY` server-side. Do not use a `NEXT_PUBLIC_` prefix for secrets.
 
 ```bash
-# TTC GTFS-Realtime feeds (surface routes)
-TTC_GTFS_RT_VEHICLES=https://bustime.ttc.ca/gtfsrt/vehicles
-TTC_GTFS_RT_TRIPS=https://bustime.ttc.ca/gtfsrt/trips
-TTC_GTFS_RT_ALERTS=https://bustime.ttc.ca/gtfsrt/alerts
-
-# Ask Pulse (server-side only — never exposed to the browser)
-OPENAI_API_KEY=sk-...
-# OPENAI_MODEL=gpt-4o        # optional; any tool-calling chat model works
+npm run typecheck
+npm run lint
+npm run build
+npm run start
 ```
 
-`.env.local` is gitignored and must never be committed.
+## Transit data
 
-## Scripts
+Feed URLs are configured in `.env.local.example`. The repository includes static route/stop JSON. Refresh it when needed with `npm run build:gtfs`; this command downloads external TTC data and needs network access.
 
-```bash
-npm run dev         # development server
-npm run build       # production build
-npm run start       # serve the production build
-npm run lint        # eslint (next/core-web-vitals)
-npm run build:gtfs  # download the TTC static feed → src/data/*.json
-```
-
-## Project structure
-
-```
-src/
-  app/
-    layout.tsx                 # fonts + persistent nav
-    globals.css                # Tailwind + keyframes + scroll-driven reveals
-    page.tsx                   # Home
-    map/ routes/ alerts/ ask/  # page routes
-    api/
-      vehicles/  trip/         # live positions + trip paths
-      arrivals/  stops/        # arrivals + stop search
-      alerts/                  # official TTC alerts (with ?fresh re-scrape)
-      ask/                     # streaming AI assistant (tool-grounded)
-  components/
-    Nav.tsx, TransitGlyph.tsx
-    home/                      # Hero, FeatureCards, DataGrid, Faq, Footer, …
-    map/                       # LiveMap + LeafletMap (animated tracking)
-    alerts/AlertsCenter.tsx
-    ask/AskPulse.tsx
-  lib/
-    gtfs.ts                    # GTFS-RT data layer (vehicles / arrivals / trips)
-    gtfs-static.ts             # embedded stops + routes, stop search / geocode
-    ttc-alerts.ts              # official ttc.ca alerts scraper
-    data.ts                    # shared types + mock fallbacks
-    hooks.ts                   # live-data React hooks
-  data/                        # embedded GTFS static JSON (built via build:gtfs)
-scripts/build-gtfs.mjs         # GTFS static → JSON
-```
+The map/API layer can show fallback sample data when feeds fail. Inspect the `degraded` response flag and displayed status. The AI tools do not substitute fabricated vehicles or alerts for failed requests. Home-page previews and route cards include illustrative data.
 
 ## Deployment
 
-Deploys as a standard Next.js app (e.g. Vercel). Set the environment variables in
-your host, run `npm run build:gtfs` as part of the build so the static stop/route
-data is embedded, and configure `OPENAI_API_KEY` server-side.
+Import into Vercel using the Next.js preset and `npm run build`. Existing static JSON avoids depending on a GTFS download during every deployment. Configure feed URLs if defaults need changing. Public AI access needs authentication or deployment-level access controls and a spending limit before adding a paid API key; this repository does not include a durable rate limiter.
 
-Security headers (HSTS, `X-Content-Type-Options`, `X-Frame-Options`,
-`Referrer-Policy`, a scoped `Permissions-Policy` for geolocation) are set in
-[`next.config.mjs`](next.config.mjs).
+## Structure
 
-## Notes
+- `src/app/api/`: transit and assistant endpoints.
+- `src/lib/gtfs.ts`: realtime feed handling and caching.
+- `src/lib/ttc-alerts.ts`: alert extraction.
+- `src/lib/gtfs-static.ts`: stop and route lookup.
+- `src/components/map/`: map interface.
+- `scripts/build-gtfs.mjs`: static data importer.
 
-- The home scroll effects use CSS scroll-driven animations (`animation-timeline`);
-  browsers without support fall back to fully-visible content, and reduced-motion
-  is respected.
-- The live TTC realtime feed occasionally has brief outages; the app serves the
-  last known-good data during those, and clearly marks demo/fallback data in the UI.
+## Status
+
+Personal project with live integrations and prototype areas. It is not affiliated with the TTC. External feed availability, deployed AI access controls, and end-to-end live-data behaviour need verification for each deployment.

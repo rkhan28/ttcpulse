@@ -3,6 +3,7 @@
 // Security headers applied to every response. Kept conservative so the Leaflet
 // map (CARTO tiles) and the Ask Pulse streaming endpoint keep working.
 const securityHeaders = [
+  { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -13,7 +14,7 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
-  poweredByHeader: false, // don't advertise the framework / version
+  poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -1,13 +1,17 @@
 import OpenAI from "openai";
-import { ALERTS, VEHICLES, type ArrivalCard, type ChatMsg } from "@/lib/data";
+import { type ArrivalCard, type ChatMsg } from "@/lib/data";
 import { getAlerts, getArrivals, getVehicles, nearestVehicles } from "@/lib/gtfs";
 import { geocodePlace, nearestStopGroup } from "@/lib/gtfs-static";
+
+import { parseChatPayload, readBoundedJson, requireSameOriginJson, RequestError } from "@/lib/request-security";
+import { reserveAskBudget } from "@/lib/ask-budget";
 
 interface Loc { lat: number; lng: number; }
 const NEAR_ME = /\b(near|around|by|close to)?\s*(me|my location|here|current location|nearby|where i am)\b/i;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 const MAX_TOOL_TURNS = 6;
@@ -93,10 +97,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 const modeName = (t: string) => (t === "subway" ? "Subway" : t === "streetcar" ? "Streetcar" : "Bus");
 
-// Tool implementations reuse the GTFS data layer with the same mock fallback as
-// the /api/* route handlers, so Pulse is grounded in real (or fallback) data.
-// Tools return `cards` (one per route/vehicle) which the app renders as visual
-// cards; the model's text should stay short and let the cards carry the details.
+// Tool results supply the same arrival cards rendered by the chat interface.
 async function runTool(name: string, input: Record<string, unknown>, loc?: Loc): Promise<{ result: unknown; cards?: ArrivalCard[] }> {
   if (name === "get_arrivals") {
     let stop = String(input.stopOrStation ?? "").trim();
@@ -207,25 +208,25 @@ export async function POST(req: Request) {
     return streamError("Ask Pulse is unavailable in this deployment. You can still browse the map and service alerts.");
   }
 
-  let chat: ChatMsg[] = [];
+  let chat: ChatMsg[];
   let loc: Loc | undefined;
   try {
-    const body = await req.json();
-    chat = Array.isArray(body?.messages) ? body.messages.filter((m: unknown): m is ChatMsg => {
-      if (!m || typeof m !== "object") return false;
-      const item = m as Record<string, unknown>;
-      return (item.role === "user" || item.role === "assistant") && typeof item.text === "string" && item.text.length <= 4000;
-    }).slice(-12) : [];
-    const l = body?.location;
-    if (l && Number.isFinite(l.lat) && Number.isFinite(l.lng) && Math.abs(l.lat) <= 90 && Math.abs(l.lng) <= 180) {
-      loc = { lat: l.lat, lng: l.lng };
-    }
-  } catch {
-    return streamError("Sorry, I couldn't read that message.");
+    requireSameOriginJson(req);
+    const parsed = parseChatPayload(await readBoundedJson(req));
+    chat = parsed.chat;
+    loc = parsed.location;
+  } catch (error) {
+    return streamError(error instanceof RequestError ? error.message : "Sorry, I couldn't read that message.", error instanceof RequestError ? error.status : 400);
   }
 
   const history = toMessages(chat);
   if (!history.length) return streamError("Ask me about a TTC route, stop, delay, or your commute.");
+
+  try {
+    if (!await reserveAskBudget()) return streamError("Ask Pulse has reached its usage limit. Please try again later.", 429);
+  } catch {
+    return streamError("Ask Pulse is temporarily unavailable. Please try again later.", 503);
+  }
 
   // Ground "near me" queries: tell the model where the user is (as a stop name)
   // so it can answer without asking for an intersection.
@@ -239,12 +240,18 @@ export async function POST(req: Request) {
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{ role: "system", content: SYSTEM + locNote }, ...history];
 
-  const client = new OpenAI();
+  const client = new OpenAI({ timeout: 20000, maxRetries: 0 });
+  const abort = new AbortController();
+  const onDisconnect = () => abort.abort();
+  req.signal.addEventListener("abort", onDisconnect, { once: true });
+  if (req.signal.aborted) abort.abort();
+  const deadline = setTimeout(() => abort.abort(), 50000);
   const encoder = new TextEncoder();
 
+  let cancelled = false;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      const send = (obj: unknown) => { if (!abort.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n")); };
       try {
         for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
           const completion = await client.chat.completions.create({
@@ -253,7 +260,8 @@ export async function POST(req: Request) {
             messages,
             tools: TOOLS,
             stream: true,
-          });
+            parallel_tool_calls: false,
+          }, { signal: abort.signal });
 
           let content = "";
           // Accumulate streamed tool-call fragments keyed by their array index.
@@ -275,6 +283,7 @@ export async function POST(req: Request) {
           }
 
           const toolCalls = Object.values(calls);
+          if (toolCalls.length > 3) throw new Error("Tool-call limit reached");
           if (toolCalls.length === 0) break; // model produced a final text answer
 
           messages.push({
@@ -286,35 +295,41 @@ export async function POST(req: Request) {
           for (const c of toolCalls) {
             let input: Record<string, unknown> = {};
             try {
-              input = JSON.parse(c.args || "{}");
+              if (c.args.length > 4096) throw new Error("Tool arguments too large");
+              const parsed: unknown = JSON.parse(c.args || "{}");
+              if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) input = parsed as Record<string, unknown>;
             } catch {
               /* leave empty on malformed args */
             }
+            if (abort.signal.aborted) break;
             const { result, cards } = await runTool(c.name, input, loc);
             for (const card of cards ?? []) send({ type: "card", card });
             messages.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(result) });
           }
         }
         send({ type: "done" });
-      } catch (err) {
-        console.error("/api/ask error:", err);
+      } catch {
+        console.error("Assistant request failed");
         send({ type: "error", message: "Pulse hit a problem reaching the assistant. Please try again." });
       } finally {
-        controller.close();
+        clearTimeout(deadline);
+        req.signal.removeEventListener("abort", onDisconnect);
+        if (!cancelled) controller.close();
       }
     },
+    cancel() { cancelled = true; abort.abort(); clearTimeout(deadline); req.signal.removeEventListener("abort", onDisconnect); },
   });
 
   return new Response(stream, {
-    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff" },
   });
 }
 
 // Minimal single-event NDJSON stream for early-exit cases.
-function streamError(message: string): Response {
+function streamError(message: string, status = 200): Response {
   const payload = JSON.stringify({ type: "error", message }) + "\n";
   return new Response(payload, {
-    status: 200,
-    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" },
+    status,
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff" },
   });
 }

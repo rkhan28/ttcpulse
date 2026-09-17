@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     };
     return NextResponse.json(body);
   } catch (err) {
-    console.error("/api/vehicles failed, serving mock:", err);
+    console.error("/api/vehicles failed, serving mock:");
     const body: VehiclesResponse = { vehicles: VEHICLES, degraded: true, updated: new Date().toISOString() };
     return NextResponse.json(body);
   }

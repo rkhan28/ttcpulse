@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     };
     return NextResponse.json(body);
   } catch (err) {
-    console.error("/api/alerts failed, serving mock:", err);
+    console.error("/api/alerts failed, serving mock:");
     const body: AlertsResponse = { alerts: ALERTS, degraded: true, updated: new Date().toISOString() };
     return NextResponse.json(body);
   }

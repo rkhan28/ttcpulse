@@ -10,11 +10,11 @@ next-env.d.ts
 
 # production / hosting
 /coverage
-.vercel
 
 # env — never commit real secrets
-.env
-.env*.local
+.env*
+!.env.example
+!.env.*.example
 
 # logs
 *.log
@@ -25,3 +25,12 @@ yarn-error.log*
 # os / editor
 .DS_Store
 .idea
+
+# local credentials and generated reports
+*.pem
+*.key
+*.p12
+*.pfx
+.vercel/
+playwright-report/
+test-results/

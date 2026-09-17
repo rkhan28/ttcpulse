@@ -74,7 +74,6 @@ function envUrl(name: string): string {
   return url;
 }
 
-// ---- route classification -------------------------------------------------
 
 const STREETCAR = new Set([501, 503, 504, 505, 506, 508, 509, 510, 511, 512, 301, 304, 305, 306, 310]);
 const SUBWAY: Record<string, { color: string; tc: string; line: string }> = {
@@ -134,7 +133,6 @@ function ago(timestampSec?: number | Long | null): string {
 // gtfs-realtime-bindings returns Long for 64-bit fields; narrow loosely.
 type Long = { toNumber(): number };
 
-// ---- public API -----------------------------------------------------------
 
 // Last successfully-decoded vehicle set, kept so a brief TTC feed outage serves
 // slightly-stale REAL positions instead of collapsing to the tiny mock set.
@@ -146,7 +144,7 @@ export async function getVehicles(): Promise<Vehicle[]> {
     return await getVehiclesLive();
   } catch (err) {
     if (lastGoodVehicles && Date.now() - lastGoodVehicles.at < LAST_GOOD_MAX_AGE_MS) {
-      console.warn("vehicles feed failed; serving last-good positions:", err);
+      console.warn("vehicles feed failed; serving last-good positions:");
       return lastGoodVehicles.value;
     }
     throw err;
@@ -268,7 +266,7 @@ export async function getAlerts(force = false): Promise<AlertItem[]> {
     const official = await getServiceAlerts(force);
     if (official.length) return official;
   } catch (err) {
-    console.error("official TTC alerts failed, falling back to GTFS-RT:", err);
+    console.error("official TTC alerts failed, falling back to GTFS-RT:");
   }
   return getAlertsRT();
 }

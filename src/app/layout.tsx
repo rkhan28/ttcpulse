@@ -7,7 +7,7 @@ import Nav from "@/components/Nav";
 export const metadata: Metadata = {
   title: "TTC Pulse — Live TTC intelligence for every ride",
   description:
-    "A premium live TTC companion: live vehicles, routes, alerts, nearby stops, commute status, and an AI assistant called Ask Pulse.",
+    "Follow Toronto transit with vehicle maps, service alerts, nearby stops and Ask Pulse.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

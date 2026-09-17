@@ -5,6 +5,14 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     defaults:
       run:
         working-directory: .
@@ -16,6 +24,12 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+        env:
+          REDIS_CONTAINER: ${{ job.services.redis.id }}
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+      - run: npm run verify:api

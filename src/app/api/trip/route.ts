@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 // the map can gracefully fall back to just the live vehicle point.
 export async function GET(req: Request) {
   const tripId = new URL(req.url).searchParams.get("tripId")?.trim() || "";
+  if (tripId.length > 200) return NextResponse.json({ error: "Query is too long" }, { status: 400 });
   if (!tripId) {
     // Bad input (no tripId) — degraded:true distinguishes it from a valid trip
     // that simply has no placeable path (trip:null, degraded:false).
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
     const trip = await getTripDetail(tripId);
     return NextResponse.json<TripResponse>({ trip, degraded: trip === null, updated: new Date().toISOString() });
   } catch (err) {
-    console.error("/api/trip failed:", err);
+    console.error("/api/trip failed:");
     return NextResponse.json<TripResponse>({ trip: null, degraded: true, updated: new Date().toISOString() });
   }
 }

@@ -75,7 +75,7 @@ export default function AskPulse() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history, location: locRef.current }),
       });
-      if (!res.ok || !res.body) throw new Error(String(res.status));
+      if (!res.body || (!res.ok && !res.headers.get("content-type")?.includes("application/x-ndjson"))) throw new Error(String(res.status));
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -120,7 +120,7 @@ export default function AskPulse() {
   return (
     <div className="min-h-screen pt-[84px] pb-6 px-[clamp(16px,4vw,48px)]">
       <div data-rv className="max-w-[1240px] mx-auto grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5" style={{ height: "calc(100vh - 108px)" }}>
-        {/* LEFT: live context */}
+
         <div className="hidden lg:flex flex-col gap-3.5 min-h-0 overflow-y-auto">
           <div className="rounded-[18px] overflow-hidden" style={{ background: "#0C0C0C", border: "1px solid rgba(255,255,255,.09)" }}>
             <div className="flex items-center justify-between px-4 py-3.5" style={{ borderBottom: "1px solid rgba(255,255,255,.07)" }}>
@@ -173,7 +173,6 @@ export default function AskPulse() {
           </div>
         </div>
 
-        {/* RIGHT: chat */}
         <div className="flex flex-col min-h-0 rounded-[22px] overflow-hidden" style={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,.09)" }}>
           <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,.07)" }}>
             <span className="inline-flex w-10 h-10 rounded-xl items-center justify-center flex-none" style={{ background: "linear-gradient(135deg,#2563EB,#7C3AED)" }}>

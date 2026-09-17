@@ -1,7 +1,4 @@
-// Server-only scraper for the OFFICIAL TTC alerts feed — the exact JSON API that
-// powers ttc.ca/service-alerts and ttc.ca/service-advisories/Service-Changes.
-// One call returns live route disruptions, elevator/escalator (accessibility)
-// alerts, and planned service changes, so our list matches the TTC site 1:1.
+// Service alerts from the endpoint used by ttc.ca.
 import "server-only";
 import type { AlertItem, Mode } from "./data";
 

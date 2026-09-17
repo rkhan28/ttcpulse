@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 // returns mock arrivals with degraded:true so the UI never blanks.
 export async function GET(req: Request) {
   const stop = new URL(req.url).searchParams.get("stop")?.trim() || "";
+  if (stop.length > 200) return NextResponse.json({ error: "Query is too long" }, { status: 400 });
   if (!stop) {
     const body: ArrivalsResponse = { stop: "", arrivals: MOCK_ARRIVALS, degraded: true, updated: new Date().toISOString() };
     return NextResponse.json(body);
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
     };
     return NextResponse.json(body);
   } catch (err) {
-    console.error("/api/arrivals failed, serving mock:", err);
+    console.error("/api/arrivals failed, serving mock:");
     const body: ArrivalsResponse = { stop, arrivals: MOCK_ARRIVALS, degraded: true, updated: new Date().toISOString() };
     return NextResponse.json(body);
   }

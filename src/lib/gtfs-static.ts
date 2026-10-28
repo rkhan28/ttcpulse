@@ -94,6 +94,7 @@ function significantTokens(n: string): string[] {
 /** All physical stop IDs that share a human stop/station name. */
 export function resolveStopIds(name: string): string[] {
   const n = norm(name);
+  if (!n) return [];
   const exact = groups.get(n);
   if (exact) return exact.ids;
 

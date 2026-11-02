@@ -32,7 +32,7 @@ function loadStaticModule() {
   return loaded.exports;
 }
 
-const { resolveStopIds, searchStops, geocodePlace, routeMode } = loadStaticModule();
+const { resolveStopIds, searchStops, geocodePlace, nearestStopGroup, routeMode } = loadStaticModule();
 
 test('blank stop names never resolve to unrelated stop IDs', () => {
   assert.deepEqual(resolveStopIds(''), []);
@@ -53,4 +53,11 @@ test('search, geocoding and route classification preserve expected behavior', ()
   assert.equal(routeMode('504'), 'streetcar');
   assert.equal(routeMode('1'), 'subway');
   assert.equal(routeMode('unknown'), undefined);
+});
+
+test('nearest stop lookup rejects invalid GPS fixes', () => {
+  for (const [lat, lng] of [[NaN, -79.4], [43.65, Infinity], [Infinity, -79.4], [91, -79.4], [-91, -79.4], [43.65, 181], [43.65, -181]]) {
+    assert.equal(nearestStopGroup(lat, lng), undefined);
+  }
+  assert.equal(nearestStopGroup(43.645, -79.38)?.name, 'Union Station');
 });

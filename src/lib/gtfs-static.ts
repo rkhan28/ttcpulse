@@ -148,6 +148,8 @@ export function geocodePlace(q: string): StopGroup | undefined {
 /** Nearest stop group to a coordinate — reverse-geocodes a user's GPS fix so the
  *  assistant can answer "near me" without asking for an intersection. */
 export function nearestStopGroup(lat: number, lng: number): StopGroup | undefined {
+  // Invalid GPS fixes must not silently resolve to the first stop in the feed.
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return undefined;
   const kx = Math.cos((lat * Math.PI) / 180);
   let best: StopGroup | undefined;
   let bestD = Infinity;

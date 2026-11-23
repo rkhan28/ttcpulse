@@ -61,3 +61,11 @@ test('nearest stop lookup rejects invalid GPS fixes', () => {
   }
   assert.equal(nearestStopGroup(43.645, -79.38)?.name, 'Union Station');
 });
+
+test('stop search rejects invalid result limits and floors fractional limits', () => {
+  for (const limit of [NaN, Infinity, -Infinity, -1, 0, 0.5]) {
+    assert.deepEqual(searchStops('st', limit), []);
+  }
+  assert.equal(searchStops('st', 1).length, 1);
+  assert.equal(searchStops('st', 2).length, 2);
+});

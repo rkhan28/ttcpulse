@@ -67,7 +67,7 @@ export function hasFullStops(): boolean {
 /** Fuzzy stop search by name, ranked exact → prefix → substring. */
 export function searchStops(q: string, limit = 8): StopGroup[] {
   const n = norm(q);
-  if (n.length < 2) return [];
+  if (n.length < 2 || !Number.isFinite(limit) || limit <= 0) return [];
   const scored: { g: StopGroup; score: number }[] = [];
   for (const g of GROUPS) {
     const name = norm(g.name);
@@ -78,7 +78,7 @@ export function searchStops(q: string, limit = 8): StopGroup[] {
     if (score >= 0) scored.push({ g, score });
   }
   scored.sort((a, b) => a.score - b.score || a.g.name.length - b.g.name.length);
-  return scored.slice(0, limit).map((s) => s.g);
+  return scored.slice(0, Math.floor(limit)).map((s) => s.g);
 }
 
 // Connector words dropped when matching intersection-style queries so that
